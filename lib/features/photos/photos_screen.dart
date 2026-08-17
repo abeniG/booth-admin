@@ -1,20 +1,56 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
+import 'package:booth_admin/models/cloudinary_resource.dart';
+import 'package:booth_admin/services/cloudinary_provider.dart';
 
-class PhotosScreen extends StatefulWidget {
+class PhotosScreen extends ConsumerStatefulWidget {
   const PhotosScreen({super.key});
 
   @override
-  State<PhotosScreen> createState() => _PhotosScreenState();
+  ConsumerState<PhotosScreen> createState() => _PhotosScreenState();
 }
 
-class _PhotosScreenState extends State<PhotosScreen> {
+class _PhotosScreenState extends ConsumerState<PhotosScreen> {
   bool isGridView = true;
+  String _searchQuery = '';
+  String _dateFilter = 'All Dates';
+
+  List<CloudinaryResource> _applyFilters(List<CloudinaryResource> all) {
+    final now = DateTime.now();
+    return all.where((r) {
+      // Search filter
+      if (_searchQuery.isNotEmpty &&
+          !r.publicId.toLowerCase().contains(_searchQuery.toLowerCase())) {
+        return false;
+      }
+      // Date filter
+      if (_dateFilter == 'Today') {
+        return r.createdAt.year == now.year &&
+            r.createdAt.month == now.month &&
+            r.createdAt.day == now.day;
+      }
+      if (_dateFilter == 'Yesterday') {
+        final yesterday = now.subtract(const Duration(days: 1));
+        return r.createdAt.year == yesterday.year &&
+            r.createdAt.month == yesterday.month &&
+            r.createdAt.day == yesterday.day;
+      }
+      if (_dateFilter == 'Last 7 Days') {
+        return r.createdAt.isAfter(now.subtract(const Duration(days: 7)));
+      }
+      return true;
+    }).toList();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final photosAsync = ref.watch(cloudinaryPhotosProvider);
+
     return MaxWidthContainer(
       child: Scaffold(
         body: Column(
@@ -25,9 +61,35 @@ class _PhotosScreenState extends State<PhotosScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Photos',
-                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                  Row(
+                    children: [
+                      const Text(
+                        'Photos',
+                        style: TextStyle(
+                            fontSize: 28, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(width: 12),
+                      photosAsync.when(
+                        data: (photos) => Chip(
+                          label: Text(
+                            '${photos.length}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w600, fontSize: 12),
+                          ),
+                          backgroundColor: AppTheme.primary.withOpacity(0.12),
+                          side: BorderSide.none,
+                        ),
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(LucideIcons.refreshCw, size: 18),
+                        tooltip: 'Refresh',
+                        onPressed: () =>
+                            ref.invalidate(cloudinaryPhotosProvider),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: 16),
                   _buildToolbar(context),
@@ -35,7 +97,23 @@ class _PhotosScreenState extends State<PhotosScreen> {
               ),
             ),
             Expanded(
-              child: isGridView ? const _PhotosGrid() : const _PhotosList(),
+              child: photosAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (err, _) => _ErrorWidget(
+                  message: err.toString(),
+                  onRetry: () => ref.invalidate(cloudinaryPhotosProvider),
+                ),
+                data: (photos) {
+                  final filtered = _applyFilters(photos);
+                  if (filtered.isEmpty) {
+                    return const _EmptyState(
+                        message: 'No photos found. Adjust your filters.');
+                  }
+                  return isGridView
+                      ? _PhotosGrid(photos: filtered)
+                      : _PhotosList(photos: filtered);
+                },
+              ),
             ),
           ],
         ),
@@ -45,7 +123,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
 
   Widget _buildToolbar(BuildContext context) {
     final isMobile = ResponsiveLayout.isMobile(context);
-
     return Wrap(
       spacing: 16,
       runSpacing: 16,
@@ -58,6 +135,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
               hintText: 'Search photos...',
               prefixIcon: Icon(LucideIcons.search),
             ),
+            onChanged: (val) => setState(() => _searchQuery = val),
           ),
         ),
         DropdownMenu<String>(
@@ -68,102 +146,98 @@ class _PhotosScreenState extends State<PhotosScreen> {
             DropdownMenuEntry(value: 'Yesterday', label: 'Yesterday'),
             DropdownMenuEntry(value: 'Last 7 Days', label: 'Last 7 Days'),
           ],
-          onSelected: (value) {},
-        ),
-        DropdownMenu<String>(
-          initialSelection: 'All Status',
-          dropdownMenuEntries: const [
-            DropdownMenuEntry(value: 'All Status', label: 'All Status'),
-            DropdownMenuEntry(value: 'Has QR', label: 'Has QR'),
-            DropdownMenuEntry(value: 'No QR', label: 'No QR'),
-          ],
-          onSelected: (value) {},
+          onSelected: (value) =>
+              setState(() => _dateFilter = value ?? 'All Dates'),
         ),
         const Spacer(),
-        // Grid / List Toggle
         SegmentedButton<bool>(
           segments: const [
             ButtonSegment(value: true, icon: Icon(LucideIcons.grid)),
             ButtonSegment(value: false, icon: Icon(LucideIcons.list)),
           ],
           selected: {isGridView},
-          onSelectionChanged: (Set<bool> newSelection) {
-            setState(() {
-              isGridView = newSelection.first;
-            });
-          },
+          onSelectionChanged: (Set<bool> s) =>
+              setState(() => isGridView = s.first),
         ),
       ],
     );
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _PhotosGrid extends StatelessWidget {
-  const _PhotosGrid();
+  final List<CloudinaryResource> photos;
+  const _PhotosGrid({required this.photos});
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        int crossAxisCount = 6;
-        if (ResponsiveLayout.isMobile(context)) {
-          crossAxisCount = 2;
-        } else if (ResponsiveLayout.isTablet(context)) {
-          crossAxisCount = 3;
-        } else if (constraints.maxWidth < 1200) {
-          crossAxisCount = 4;
-        }
+    return LayoutBuilder(builder: (context, constraints) {
+      int crossAxisCount = 6;
+      if (ResponsiveLayout.isMobile(context)) {
+        crossAxisCount = 2;
+      } else if (ResponsiveLayout.isTablet(context)) {
+        crossAxisCount = 3;
+      } else if (constraints.maxWidth < 1200) {
+        crossAxisCount = 4;
+      }
 
-        return GridView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 0.8,
-          ),
-          itemCount: 20,
-          itemBuilder: (context, index) {
-            return _PhotoCard(index: index);
-          },
-        );
-      },
-    );
+      return GridView.builder(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          mainAxisSpacing: 16,
+          crossAxisSpacing: 16,
+          childAspectRatio: 0.8,
+        ),
+        itemCount: photos.length,
+        itemBuilder: (context, index) => _PhotoCard(photo: photos[index]),
+      );
+    });
   }
 }
 
 class _PhotosList extends StatelessWidget {
-  const _PhotosList();
+  final List<CloudinaryResource> photos;
+  const _PhotosList({required this.photos});
 
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      itemCount: 20,
-      separatorBuilder: (context, index) => const Divider(),
+      itemCount: photos.length,
+      separatorBuilder: (_, __) => const Divider(),
       itemBuilder: (context, index) {
+        final photo = photos[index];
         return ListTile(
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          leading: Container(
-            width: 60,
-            height: 60,
-            color: Colors.grey.shade200,
-            child: const Icon(LucideIcons.image, color: Colors.grey),
+          leading: ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: CachedNetworkImage(
+              imageUrl: photo.secureUrl,
+              width: 60,
+              height: 60,
+              fit: BoxFit.cover,
+              placeholder: (_, __) =>
+                  Container(width: 60, height: 60, color: Colors.grey.shade200),
+              errorWidget: (_, __, ___) => Container(
+                width: 60,
+                height: 60,
+                color: Colors.grey.shade200,
+                child: const Icon(LucideIcons.image, color: Colors.grey),
+              ),
+            ),
           ),
-          title: Text('Photo_IMG_${index}_0391.png'),
-          subtitle: const Text('Captured today at 14:32 • QR Active'),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(onPressed: () {}, icon: const Icon(LucideIcons.eye)),
-              IconButton(
-                  onPressed: () {}, icon: const Icon(LucideIcons.download)),
-              IconButton(
-                  onPressed: () {},
-                  icon: const Icon(LucideIcons.trash, color: AppTheme.error)),
-            ],
+          title: Text(
+            photo.publicId.split('/').last,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
+          subtitle: Text(
+            '${DateFormat('MMM d, y • HH:mm').format(photo.createdAt.toLocal())}  •  ${photo.formattedSize}',
+          ),
+          trailing: _PhotoActions(photo: photo),
         );
       },
     );
@@ -171,8 +245,8 @@ class _PhotosList extends StatelessWidget {
 }
 
 class _PhotoCard extends StatelessWidget {
-  final int index;
-  const _PhotoCard({required this.index});
+  final CloudinaryResource photo;
+  const _PhotoCard({required this.photo});
 
   @override
   Widget build(BuildContext context) {
@@ -182,10 +256,20 @@ class _PhotoCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Container(
-              color: Colors.grey.shade200,
-              child:
-                  const Icon(LucideIcons.image, size: 48, color: Colors.grey),
+            child: CachedNetworkImage(
+              imageUrl: photo.secureUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(
+                color: Colors.grey.shade200,
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              errorWidget: (_, __, ___) => Container(
+                color: Colors.grey.shade200,
+                child:
+                    const Icon(LucideIcons.image, size: 48, color: Colors.grey),
+              ),
             ),
           ),
           Container(
@@ -197,58 +281,136 @@ class _PhotoCard extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Today 14:32',
-                      style: TextStyle(
-                          fontSize: 12, color: AppTheme.textSecondary),
+                    Flexible(
+                      child: Text(
+                        DateFormat('MMM d, HH:mm')
+                            .format(photo.createdAt.toLocal()),
+                        style: TextStyle(
+                            fontSize: 11, color: AppTheme.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                    const Icon(LucideIcons.checkCircle2,
-                        size: 14, color: AppTheme.success),
+                    Text(
+                      photo.formattedSize,
+                      style: TextStyle(
+                          fontSize: 11, color: AppTheme.textSecondary),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    IconButton(
-                      icon: const Icon(LucideIcons.eye, size: 16),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'View Photo',
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.download, size: 16),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'Download',
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.qrCode, size: 16),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'Open QR',
-                    ),
-                    IconButton(
-                      icon: const Icon(LucideIcons.trash,
-                          size: 16, color: AppTheme.error),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
-                      tooltip: 'Delete',
-                    ),
-                  ],
-                )
+                const SizedBox(height: 6),
+                _PhotoActions(photo: photo),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PhotoActions extends StatelessWidget {
+  final CloudinaryResource photo;
+  const _PhotoActions({required this.photo});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          icon: const Icon(LucideIcons.eye, size: 16),
+          onPressed: () => _openUrl(photo.secureUrl),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          tooltip: 'View Photo',
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.download, size: 16),
+          onPressed: () => _openUrl(photo.secureUrl
+              .replaceFirst('/upload/', '/upload/fl_attachment/')),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          tooltip: 'Download',
+        ),
+        IconButton(
+          icon: const Icon(LucideIcons.trash, size: 16, color: AppTheme.error),
+          onPressed: () {},
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          tooltip: 'Delete',
+        ),
+      ],
+    );
+  }
+
+  void _openUrl(String url) {
+    // ignore: avoid_print
+    print('Open: $url'); // Replace with url_launcher if needed
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared helpers
+
+class _EmptyState extends StatelessWidget {
+  final String message;
+  const _EmptyState({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(LucideIcons.imageOff, size: 64, color: Colors.grey.shade400),
+          const SizedBox(height: 16),
+          Text(message,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 16)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorWidget extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorWidget({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(LucideIcons.cloudOff, size: 64, color: AppTheme.error),
+            const SizedBox(height: 16),
+            const Text(
+              'Failed to load from Cloudinary',
+              style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 18,
+                  color: AppTheme.textPrimary),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message.contains('YOUR_API_KEY')
+                  ? 'Please set your API Key and Secret in cloudinary_service.dart'
+                  : message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            const SizedBox(height: 24),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(LucideIcons.refreshCw, size: 16),
+              label: const Text('Retry'),
+            ),
+          ],
+        ),
       ),
     );
   }

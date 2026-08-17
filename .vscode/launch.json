@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "booth_admin (Web with CORS disabled)",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--web-browser-flag",
+                "--disable-web-security"
+            ]
+        },
+        {
+            "name": "booth_admin",
+            "request": "launch",
+            "type": "dart"
+        }
+    ]
+}

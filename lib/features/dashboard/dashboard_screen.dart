@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:intl/intl.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
+import 'package:booth_admin/models/cloudinary_resource.dart';
+import 'package:booth_admin/services/cloudinary_provider.dart';
 
-class DashboardScreen extends StatelessWidget {
+class DashboardScreen extends ConsumerWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final photosAsync = ref.watch(cloudinaryPhotosProvider);
+    final videosAsync = ref.watch(cloudinaryVideosProvider);
+
     return MaxWidthContainer(
       child: Scaffold(
         body: CustomScrollView(
@@ -35,7 +43,11 @@ class DashboardScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 32),
-                    const _StatsGrid(),
+                    // ── Stats ──────────────────────────────────────────────────
+                    _StatsGrid(
+                      photosAsync: photosAsync,
+                      videosAsync: videosAsync,
+                    ),
                     const SizedBox(height: 48),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -59,9 +71,20 @@ class DashboardScreen extends StatelessWidget {
                 ),
               ),
             ),
-            const SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: 24.0),
-              sliver: _RecentPhotosGrid(),
+            // ── Recent Photos ────────────────────────────────────────────────
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              sliver: photosAsync.when(
+                loading: () => const SliverToBoxAdapter(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (err, _) => SliverToBoxAdapter(
+                  child: _InlineError(message: err.toString()),
+                ),
+                data: (photos) => _RecentPhotosGrid(
+                  photos: photos.take(10).toList(),
+                ),
+              ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 48)),
           ],
@@ -71,8 +94,16 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _StatsGrid extends StatelessWidget {
-  const _StatsGrid();
+  final AsyncValue<List<CloudinaryResource>> photosAsync;
+  final AsyncValue<List<CloudinaryResource>> videosAsync;
+
+  const _StatsGrid({
+    required this.photosAsync,
+    required this.videosAsync,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -83,42 +114,67 @@ class _StatsGrid extends StatelessWidget {
       crossAxisCount = 3;
     }
 
+    final photoCount =
+        photosAsync.maybeWhen(data: (p) => '${p.length}', orElse: () => '—');
+    final videoCount =
+        videosAsync.maybeWhen(data: (v) => '${v.length}', orElse: () => '—');
+
+    // Count how many photos were captured today
+    final todayCount = photosAsync.maybeWhen(
+      data: (p) {
+        final today = DateTime.now();
+        return p
+            .where((r) =>
+                r.createdAt.year == today.year &&
+                r.createdAt.month == today.month &&
+                r.createdAt.day == today.day)
+            .length;
+      },
+      orElse: () => 0,
+    );
+
     final stats = [
       {
         'title': 'Total Photos',
-        'value': '1,248',
-        'subtitle': '+12 today',
-        'icon': LucideIcons.image
+        'value': photoCount,
+        'subtitle': todayCount > 0 ? '+$todayCount today' : 'From Cloudinary',
+        'icon': LucideIcons.image,
+        'loading': photosAsync.isLoading,
       },
       {
         'title': 'Total Videos',
-        'value': '432',
-        'subtitle': '+4 today',
-        'icon': LucideIcons.video
+        'value': videoCount,
+        'subtitle': 'From Cloudinary',
+        'icon': LucideIcons.video,
+        'loading': videosAsync.isLoading,
       },
       {
         'title': 'Active QRs',
-        'value': '84',
-        'subtitle': 'Scanning now',
-        'icon': LucideIcons.qrCode
+        'value': '—',
+        'subtitle': 'Coming soon',
+        'icon': LucideIcons.qrCode,
+        'loading': false,
       },
       {
         'title': 'Stickers',
-        'value': '24',
-        'subtitle': 'All active',
-        'icon': LucideIcons.sticker
+        'value': '—',
+        'subtitle': 'Manage in Design',
+        'icon': LucideIcons.sticker,
+        'loading': false,
       },
       {
         'title': 'Backgrounds',
-        'value': '12',
-        'subtitle': '3 inactive',
-        'icon': LucideIcons.image
+        'value': '—',
+        'subtitle': 'Manage in Design',
+        'icon': LucideIcons.image,
+        'loading': false,
       },
       {
         'title': 'Filters',
-        'value': '8',
+        'value': '—',
         'subtitle': 'Preset styles',
-        'icon': LucideIcons.sparkles
+        'icon': LucideIcons.sparkles,
+        'loading': false,
       },
     ];
 
@@ -133,6 +189,7 @@ class _StatsGrid extends StatelessWidget {
             value: stat['value'] as String,
             subtitle: stat['subtitle'] as String,
             icon: stat['icon'] as IconData,
+            isLoading: stat['loading'] as bool,
           ),
         );
       }).toList(),
@@ -141,20 +198,16 @@ class _StatsGrid extends StatelessWidget {
 
   double _getCardWidth(BuildContext context, int columns) {
     double screenWidth = MediaQuery.of(context).size.width;
-    double padding = 48; // 24 on each side
+    const double padding = 48;
     double navWidth = 0;
-
-    // account for navigation bars roughly
     if (ResponsiveLayout.isDesktop(context)) {
       navWidth = 250;
-      screenWidth = screenWidth > 1600 ? 1600 : screenWidth; // max width
+      screenWidth = screenWidth > 1600 ? 1600 : screenWidth;
     } else if (ResponsiveLayout.isTablet(context)) {
       navWidth = 80;
     }
-
-    double availableWidth = screenWidth - padding - navWidth;
-    double spacing = 16 * (columns - 1);
-
+    final double availableWidth = screenWidth - padding - navWidth;
+    final double spacing = 16 * (columns - 1);
     return ((availableWidth - spacing) / columns).floorToDouble();
   }
 }
@@ -164,12 +217,14 @@ class _StatCard extends StatelessWidget {
   final String value;
   final String subtitle;
   final IconData icon;
+  final bool isLoading;
 
   const _StatCard({
     required this.title,
     required this.value,
     required this.subtitle,
     required this.icon,
+    required this.isLoading,
   });
 
   @override
@@ -196,20 +251,25 @@ class _StatCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.bold,
-                color: AppTheme.textPrimary,
-              ),
-            ),
+            isLoading
+                ? const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
             const SizedBox(height: 4),
             Text(
               subtitle,
               style: TextStyle(
                 fontSize: 12,
-                color: title.contains('Total Photos')
+                color: subtitle.contains('today') && !subtitle.contains('0')
                     ? AppTheme.success
                     : AppTheme.textSecondary,
                 fontWeight: FontWeight.w500,
@@ -222,32 +282,30 @@ class _StatCard extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _RecentPhotosGrid extends StatelessWidget {
-  const _RecentPhotosGrid();
+  final List<CloudinaryResource> photos;
+  const _RecentPhotosGrid({required this.photos});
 
   @override
   Widget build(BuildContext context) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
         int crossAxisCount = 5;
-        if (ResponsiveLayout.isMobile(context)) {
-          crossAxisCount = 2; // Mobile specifies 2-column grid or list
-        } else if (ResponsiveLayout.isTablet(context)) {
-          crossAxisCount = 3;
-        }
+        if (ResponsiveLayout.isMobile(context)) crossAxisCount = 2;
+        if (ResponsiveLayout.isTablet(context)) crossAxisCount = 3;
 
         return SliverGrid(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: crossAxisCount,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
-            childAspectRatio: 0.8, // Slightly taller for info
+            childAspectRatio: 0.8,
           ),
           delegate: SliverChildBuilderDelegate(
-            (context, index) {
-              return const _PhotoCardPlaceholder();
-            },
-            childCount: 10,
+            (context, index) => _RecentPhotoCard(photo: photos[index]),
+            childCount: photos.length,
           ),
         );
       },
@@ -255,21 +313,39 @@ class _RecentPhotosGrid extends StatelessWidget {
   }
 }
 
-class _PhotoCardPlaceholder extends StatelessWidget {
-  const _PhotoCardPlaceholder();
+class _RecentPhotoCard extends StatelessWidget {
+  final CloudinaryResource photo;
+  const _RecentPhotoCard({required this.photo});
 
   @override
   Widget build(BuildContext context) {
+    final isToday = () {
+      final now = DateTime.now();
+      return photo.createdAt.year == now.year &&
+          photo.createdAt.month == now.month &&
+          photo.createdAt.day == now.day;
+    }();
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
-            child: Container(
-              color: Colors.grey.shade200,
-              child:
-                  const Icon(LucideIcons.image, size: 48, color: Colors.grey),
+            child: CachedNetworkImage(
+              imageUrl: photo.secureUrl,
+              fit: BoxFit.cover,
+              placeholder: (_, __) => Container(
+                color: Colors.grey.shade200,
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+              errorWidget: (_, __, ___) => Container(
+                color: Colors.grey.shade200,
+                child:
+                    const Icon(LucideIcons.image, size: 48, color: Colors.grey),
+              ),
             ),
           ),
           Container(
@@ -281,10 +357,17 @@ class _PhotoCardPlaceholder extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      'Just now',
-                      style: TextStyle(
-                          fontSize: 12, color: AppTheme.textSecondary),
+                    Flexible(
+                      child: Text(
+                        isToday
+                            ? DateFormat('HH:mm')
+                                .format(photo.createdAt.toLocal())
+                            : DateFormat('MMM d')
+                                .format(photo.createdAt.toLocal()),
+                        style: TextStyle(
+                            fontSize: 11, color: AppTheme.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                     const Icon(LucideIcons.checkCircle2,
                         size: 14, color: AppTheme.success),
@@ -316,8 +399,38 @@ class _PhotoCardPlaceholder extends StatelessWidget {
                           const BoxConstraints(minWidth: 32, minHeight: 32),
                     ),
                   ],
-                )
+                ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineError extends StatelessWidget {
+  final String message;
+  const _InlineError({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.error.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.alertCircle, color: AppTheme.error, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message.contains('YOUR_API_KEY')
+                  ? 'Set your Cloudinary API Key & Secret in cloudinary_service.dart'
+                  : 'Could not load photos: $message',
+              style: const TextStyle(color: AppTheme.error, fontSize: 13),
             ),
           ),
         ],
