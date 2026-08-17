@@ -1,3 +1,5 @@
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -7,6 +9,7 @@ import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
 import 'package:booth_admin/models/cloudinary_resource.dart';
 import 'package:booth_admin/services/cloudinary_provider.dart';
+import 'package:booth_admin/services/cloudinary_service.dart';
 
 class PhotosScreen extends ConsumerStatefulWidget {
   const PhotosScreen({super.key});
@@ -308,45 +311,97 @@ class _PhotoCard extends StatelessWidget {
   }
 }
 
-class _PhotoActions extends StatelessWidget {
+class _PhotoActions extends ConsumerWidget {
   final CloudinaryResource photo;
   const _PhotoActions({required this.photo});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       mainAxisSize: MainAxisSize.min,
       children: [
+        // ── View ──────────────────────────────────────────────────────────────
         IconButton(
           icon: const Icon(LucideIcons.eye, size: 16),
-          onPressed: () => _openUrl(photo.secureUrl),
+          tooltip: 'View Photo',
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          tooltip: 'View Photo',
+          onPressed: () => html.window.open(photo.secureUrl, '_blank'),
         ),
+        // ── Download ──────────────────────────────────────────────────────────
         IconButton(
           icon: const Icon(LucideIcons.download, size: 16),
-          onPressed: () => _openUrl(photo.secureUrl
-              .replaceFirst('/upload/', '/upload/fl_attachment/')),
+          tooltip: 'Download',
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          tooltip: 'Download',
+          onPressed: () {
+            // fl_attachment forces a browser download instead of a preview
+            final downloadUrl = photo.secureUrl
+                .replaceFirst('/upload/', '/upload/fl_attachment/');
+            html.window.open(downloadUrl, '_blank');
+          },
         ),
+        // ── Delete ────────────────────────────────────────────────────────────
         IconButton(
           icon: const Icon(LucideIcons.trash, size: 16, color: AppTheme.error),
-          onPressed: () {},
+          tooltip: 'Delete',
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          tooltip: 'Delete',
+          onPressed: () => _confirmDelete(context, ref),
         ),
       ],
     );
   }
 
-  void _openUrl(String url) {
-    // ignore: avoid_print
-    print('Open: $url'); // Replace with url_launcher if needed
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Photo'),
+        content: Text(
+          'Are you sure you want to permanently delete\n"${photo.publicId.split('/').last}"?\n\nThis cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await CloudinaryService.deleteResource(
+          photo.publicId, photo.resourceType);
+      // Refresh both photos and stats
+      ref.invalidate(cloudinaryPhotosProvider);
+      ref.invalidate(cloudinaryStatsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Photo deleted successfully.'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Delete failed: $e'),
+            backgroundColor: AppTheme.error,
+          ),
+        );
+      }
+    }
   }
 }
 

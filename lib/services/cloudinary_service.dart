@@ -33,6 +33,20 @@ class CloudinaryService {
     );
   }
 
+  /// Deletes a resource from Cloudinary via the Worker proxy.
+  /// The Worker handles signing server-side so the API Secret stays secure.
+  static Future<void> deleteResource(
+      String publicId, String resourceType) async {
+    final uri = Uri.parse(
+      '$_baseUrl/api/cloudinary/delete?publicId=${Uri.encodeComponent(publicId)}&resourceType=$resourceType',
+    );
+    final response = await http.delete(uri);
+    if (response.statusCode != 200) {
+      throw Exception(
+          'Delete failed (${response.statusCode}): ${response.body}');
+    }
+  }
+
   // ── Private ─────────────────────────────────────────────────────────────────
 
   static Future<List<CloudinaryResource>> _get(String url) async {
