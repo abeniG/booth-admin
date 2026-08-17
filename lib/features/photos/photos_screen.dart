@@ -149,7 +149,7 @@ class _PhotosScreenState extends ConsumerState<PhotosScreen> {
           onSelected: (value) =>
               setState(() => _dateFilter = value ?? 'All Dates'),
         ),
-        const Spacer(),
+        // Removed Spacer() here because Wrap cannot have Expanded/Spacer children
         SegmentedButton<bool>(
           segments: const [
             ButtonSegment(value: true, icon: Icon(LucideIcons.grid)),
