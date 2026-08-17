@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
-  // Brand Colors
-  static const Color primary = Color(0xFF8E744B);
-  static const Color background = Color(0xFFF7F7F5);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF1E1E1E);
-  static const Color textSecondary = Color(0xFF757575);
+  // Brand Colors for Tizita Studio
+  static const Color primary = Color(0xFF0C2243);
+  static const Color background = Color(0xFFFFF7E2); // Off-white/cream
+  static const Color surface = Color(0xFFFFF7E2);
+  static const Color accent = Color(0xFFF07522);
+  static const Color textPrimary =
+      Color(0xFF0C2243); // Dark blue for readability
+  static const Color textSecondary = Color(0xFF5A6679);
   static const Color divider = Color(0xFFE0E0E0);
   static const Color error = Color(0xFFD32F2F);
   static const Color success = Color(0xFF388E3C);
@@ -17,7 +19,7 @@ class AppTheme {
       useMaterial3: true,
       colorScheme: ColorScheme.light(
         primary: primary,
-        secondary: primary.withOpacity(0.8),
+        secondary: accent,
         background: background,
         surface: surface,
         error: error,
@@ -28,7 +30,7 @@ class AppTheme {
         onError: Colors.white,
       ),
       scaffoldBackgroundColor: background,
-      textTheme: GoogleFonts.interTextTheme().apply(
+      textTheme: GoogleFonts.bodoniModaTextTheme().apply(
         bodyColor: textPrimary,
         displayColor: textPrimary,
       ),

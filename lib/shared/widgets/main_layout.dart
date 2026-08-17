@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
 
 class MainLayout extends StatelessWidget {
@@ -52,7 +53,14 @@ class _MobileLayout extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Photo Booth Admin'),
+        title: Text(
+          'Tizita Studio',
+          style: GoogleFonts.alexBrush(
+            fontSize: 28,
+            color: AppTheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       drawer: Drawer(
         child: Column(
@@ -220,13 +228,14 @@ class _DrawerHeader extends StatelessWidget {
             child: const Icon(LucideIcons.camera, color: AppTheme.primary),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Text(
-              'Photo Booth\nAdmin',
-              style: TextStyle(
-                fontSize: 16,
+              'Tizita\nStudio',
+              style: GoogleFonts.alexBrush(
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
-                height: 1.2,
+                color: AppTheme.primary,
+                height: 1.1,
               ),
             ),
           ),
