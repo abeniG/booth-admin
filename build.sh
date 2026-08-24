@@ -1,10 +1,9 @@
 #!/bin/bash
-
 set -e
 
-echo "Installing Flutter 3.7.12..."
+echo "Installing Flutter 3.44.5..."
 
-git clone --depth 1 --branch 3.7.12 https://github.com/flutter/flutter.git "$HOME/flutter"
+git clone --depth 1 --branch 3.44.5 https://github.com/flutter/flutter.git "$HOME/flutter"
 
 export PATH="$HOME/flutter/bin:$PATH"
 
