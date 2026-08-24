@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
@@ -67,23 +67,26 @@ class _MobileLayout extends StatelessWidget {
           children: [
             const _DrawerHeader(),
             Expanded(
-              child: ListView(
-                padding: EdgeInsets.zero,
-                children: _navItems.map((item) {
-                  return ListTile(
-                    leading: Icon(item.icon),
-                    title: Text(item.label),
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      context.go(item.path);
-                    },
-                    selected: GoRouterState.of(context)
-                        .uri
-                        .path
-                        .startsWith(item.path),
-                    selectedColor: AppTheme.primary,
-                  );
-                }).toList(),
+              child: Material(
+                color: Colors.transparent,
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: _navItems.map((item) {
+                    return ListTile(
+                      leading: Icon(item.icon),
+                      title: Text(item.label),
+                      onTap: () {
+                        Navigator.pop(context); // Close drawer
+                        context.go(item.path);
+                      },
+                      selected: GoRouterState.of(context)
+                          .uri
+                          .path
+                          .startsWith(item.path),
+                      selectedColor: AppTheme.primary,
+                    );
+                  }).toList(),
+                ),
               ),
             ),
           ],
@@ -155,44 +158,47 @@ class _DesktopLayout extends StatelessWidget {
               children: [
                 const _DrawerHeader(),
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    children: _navItems.map((item) {
-                      final isSelected = GoRouterState.of(context)
-                          .uri
-                          .path
-                          .startsWith(item.path);
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        child: ListTile(
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          leading: Icon(item.icon,
-                              color: isSelected
-                                  ? AppTheme.primary
-                                  : AppTheme.textSecondary),
-                          title: Text(
-                            item.label,
-                            style: TextStyle(
-                              color: isSelected
-                                  ? AppTheme.primary
-                                  : AppTheme.textPrimary,
-                              fontWeight: isSelected
-                                  ? FontWeight.w600
-                                  : FontWeight.w400,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: _navItems.map((item) {
+                        final isSelected = GoRouterState.of(context)
+                            .uri
+                            .path
+                            .startsWith(item.path);
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 4),
+                          child: ListTile(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
                             ),
+                            leading: Icon(item.icon,
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : AppTheme.textSecondary),
+                            title: Text(
+                              item.label,
+                              style: TextStyle(
+                                color: isSelected
+                                    ? AppTheme.primary
+                                    : AppTheme.textPrimary,
+                                fontWeight: isSelected
+                                    ? FontWeight.w600
+                                    : FontWeight.w400,
+                              ),
+                            ),
+                            tileColor: isSelected
+                                ? AppTheme.primary.withOpacity(0.1)
+                                : null,
+                            onTap: () {
+                              context.go(item.path);
+                            },
                           ),
-                          tileColor: isSelected
-                              ? AppTheme.primary.withOpacity(0.1)
-                              : null,
-                          onTap: () {
-                            context.go(item.path);
-                          },
-                        ),
-                      );
-                    }).toList(),
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
               ],

@@ -36,6 +36,10 @@ export default {
       return proxySearch('resource_type:video', 30);
     }
 
+    if (url.pathname === '/api/cloudinary/upload' && request.method === 'POST') {
+      return uploadResource(request);
+    }
+
     // DELETE /api/cloudinary/delete?publicId=xxx&resourceType=image
     if (url.pathname === '/api/cloudinary/delete' && request.method === 'DELETE') {
       const publicId     = url.searchParams.get('publicId');
@@ -77,6 +81,46 @@ async function proxySearch(expression, maxResults) {
     },
     body,
   });
+
+  return new Response(await resp.text(), {
+    status: resp.status,
+    headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+  });
+}
+
+// ── Upload (signed) ───────────────────────────────────────────────────────────
+
+async function uploadResource(request) {
+  const formData = await request.formData();
+  const file = formData.get('file');
+  const folder = formData.get('folder');
+
+  if (!(file instanceof File)) {
+    return new Response(JSON.stringify({ error: 'file is required' }), {
+      status: 400,
+      headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+    });
+  }
+
+  const timestamp = Math.floor(Date.now() / 1000).toString();
+  const signableParams = [`timestamp=${timestamp}`];
+  if (typeof folder === 'string' && folder.length > 0) {
+    signableParams.unshift(`folder=${folder}`);
+  }
+  const toSign = `${signableParams.join('&')}${API_SECRET}`;
+  const signature = await sha1Hex(toSign);
+
+  const uploadForm = new FormData();
+  uploadForm.append('file', file);
+  uploadForm.append('timestamp', timestamp);
+  uploadForm.append('api_key', API_KEY);
+  uploadForm.append('signature', signature);
+  if (typeof folder === 'string' && folder.length > 0) {
+    uploadForm.append('folder', folder);
+  }
+
+  const uploadUrl = `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`;
+  const resp = await fetch(uploadUrl, { method: 'POST', body: uploadForm });
 
   return new Response(await resp.text(), {
     status: resp.status,

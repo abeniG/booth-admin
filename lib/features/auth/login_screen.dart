@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
 import 'package:booth_admin/features/auth/auth_provider.dart';
@@ -18,12 +19,89 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isLoading = false;
 
   Future<void> _handleLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage('Enter your email and password.');
+      return;
+    }
+
     setState(() => _isLoading = true);
-    await ref.read(authProvider.notifier).login(
-          _emailController.text,
-          _passwordController.text,
-        );
-    // Router will automatically redirect upon state change
+    try {
+      await ref.read(authProvider.notifier).login(email, password);
+    } on FirebaseAuthException catch (error) {
+      _showMessage(_authErrorMessage(error));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleForgotPassword() async {
+    final emailController = TextEditingController(text: _emailController.text);
+    final email = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Reset password'),
+        content: TextField(
+          controller: emailController,
+          keyboardType: TextInputType.emailAddress,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Email address',
+            prefixIcon: Icon(LucideIcons.mail),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, emailController.text),
+            child: const Text('Send email'),
+          ),
+        ],
+      ),
+    );
+    emailController.dispose();
+
+    if (email == null || email.trim().isEmpty || !mounted) return;
+
+    try {
+      await ref
+          .read(authProvider.notifier)
+          .sendPasswordResetEmail(email.trim());
+      _showMessage('Password reset email sent.');
+    } on FirebaseAuthException catch (error) {
+      _showMessage(_authErrorMessage(error));
+    }
+  }
+
+  void _showMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  String _authErrorMessage(FirebaseAuthException error) {
+    switch (error.code) {
+      case 'invalid-credential':
+      case 'invalid-login-credentials':
+        return 'The email or password is incorrect.';
+      case 'user-not-found':
+        return 'No account exists for this email.';
+      case 'wrong-password':
+        return 'The password is incorrect.';
+      case 'invalid-email':
+        return 'Enter a valid email address.';
+      case 'too-many-requests':
+        return 'Too many attempts. Try again later.';
+      case 'network-request-failed':
+        return 'Network error. Check your connection and try again.';
+      default:
+        return error.message ?? 'Authentication failed.';
+    }
   }
 
   @override
@@ -60,6 +138,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(height: 48),
           TextField(
             controller: _emailController,
+            keyboardType: TextInputType.emailAddress,
             decoration: const InputDecoration(
               hintText: 'Admin Email',
               prefixIcon: Icon(LucideIcons.mail),
@@ -89,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: _handleForgotPassword,
                 child: const Text('Forgot Password?'),
               )
             ],

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:booth_admin/models/cloudinary_resource.dart';
@@ -31,6 +32,46 @@ class CloudinaryService {
       totalPhotos: results[0].length,
       totalVideos: results[1].length,
     );
+  }
+
+  static Future<String> uploadImage(
+    Uint8List bytes,
+    String fileName, {
+    String? folder,
+  }) async {
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_baseUrl/api/cloudinary/upload'),
+    );
+
+    request.files.add(
+      http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: fileName,
+      ),
+    );
+    if (folder != null && folder.isNotEmpty) {
+      request.fields['folder'] = folder;
+    }
+
+    final response = await request.send();
+    final body = await http.Response.fromStream(response);
+
+    if (response.statusCode != 200) {
+      throw Exception(
+        'Cloudinary upload failed (${response.statusCode}): ${body.body}',
+      );
+    }
+
+    final data = jsonDecode(body.body) as Map<String, dynamic>;
+    final url = data['secure_url'] as String?;
+
+    if (url == null || url.isEmpty) {
+      throw Exception('Cloudinary upload did not return a URL.');
+    }
+
+    return url;
   }
 
   /// Deletes a resource from Cloudinary via the Worker proxy.

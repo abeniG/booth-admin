@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dotted_border/dotted_border.dart';
-import 'package:lucide_icons/lucide_icons.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
 
@@ -32,11 +32,12 @@ class UploadZone extends StatelessWidget {
     return GestureDetector(
       onTap: onSelectFile,
       child: DottedBorder(
-        color: AppTheme.primary,
-        strokeWidth: 2,
-        dashPattern: const [8, 4],
-        borderType: BorderType.RRect,
-        radius: const Radius.circular(16),
+        options: RoundedRectDottedBorderOptions(
+          color: AppTheme.primary,
+          strokeWidth: 2,
+          dashPattern: const [8, 4],
+          radius: const Radius.circular(16),
+        ),
         child: Container(
           width: double.infinity,
           height: 200,
