@@ -7,9 +7,9 @@
  *   DELETE /api/cloudinary/delete?publicId=<id>&resourceType=image|video
  */
 
-const CLOUD_NAME = 'dxdrm5jjw';
-const API_KEY    = '758911877223425';
-const API_SECRET = '-TRqKvDFSRJzQbyBYiz3hIQTTbI';
+const CLOUD_NAME = 'psklw43t';
+const API_KEY    = '223959796769149';
+const API_SECRET = 'XYgALmulEzytsE-1UYyJsMJhoxk';
 
 const CLOUDINARY_SEARCH_URL =
   `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/resources/search`;
