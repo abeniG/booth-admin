@@ -40,14 +40,32 @@ class PrintService {
               pageFormat: pageFormat,
               margin: pw.EdgeInsets.zero,
               build: (_) => pw.Row(
+                mainAxisSize: pw.MainAxisSize.max,
+                mainAxisAlignment: pw.MainAxisAlignment.start,
+                crossAxisAlignment: pw.CrossAxisAlignment.stretch,
                 children: [
-                  pw.Expanded(
-                    child: pw.Image(image, fit: pw.BoxFit.contain),
-                  ),
-                  if (firstPhotoIndex + 1 < totalPhotos)
-                    pw.Expanded(
-                      child: pw.Image(image, fit: pw.BoxFit.contain),
+                  pw.SizedBox(
+                    width: pageFormat.width / _photosPerPage,
+                    height: pageFormat.height,
+                    child: pw.Image(
+                      image,
+                      width: pageFormat.width / _photosPerPage,
+                      height: pageFormat.height,
+                      fit: pw.BoxFit.fill,
                     ),
+                  ),
+                  pw.SizedBox(
+                    width: pageFormat.width / _photosPerPage,
+                    height: pageFormat.height,
+                    child: firstPhotoIndex + 1 < totalPhotos
+                        ? pw.Image(
+                            image,
+                            width: pageFormat.width / _photosPerPage,
+                            height: pageFormat.height,
+                            fit: pw.BoxFit.fill,
+                          )
+                        : pw.SizedBox(),
+                  ),
                 ],
               ),
             ),
