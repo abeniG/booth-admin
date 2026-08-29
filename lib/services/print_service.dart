@@ -7,6 +7,7 @@ import 'package:booth_admin/models/printable.dart';
 class PrintService {
   static const double _hagakiWidthInches = 3.94;
   static const double _hagakiHeightInches = 5.83;
+  static const double _centerBorderWidth = 3;
   static const int _photosPerPage = 2;
 
   static Future<bool> printPrintable(Printable printable) async {
@@ -39,16 +40,30 @@ class PrintService {
             pw.Page(
               pageFormat: pageFormat,
               margin: pw.EdgeInsets.zero,
-              build: (_) => pw.Row(
-                children: [
-                  pw.Expanded(
-                    child: pw.Image(image, fit: pw.BoxFit.contain),
-                  ),
-                  if (firstPhotoIndex + 1 < totalPhotos)
+              build: (_) => pw.SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: pw.Row(
+                  crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+                  children: [
                     pw.Expanded(
-                      child: pw.Image(image, fit: pw.BoxFit.contain),
+                      child: pw.Center(
+                        child: pw.Image(image, fit: pw.BoxFit.contain),
+                      ),
                     ),
-                ],
+                    if (firstPhotoIndex + 1 < totalPhotos) ...[
+                      pw.Container(
+                        width: _centerBorderWidth,
+                        color: PdfColors.black,
+                      ),
+                      pw.Expanded(
+                        child: pw.Center(
+                          child: pw.Image(image, fit: pw.BoxFit.contain),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
           );
