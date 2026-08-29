@@ -48,7 +48,7 @@ class PrintService {
                   children: [
                     pw.Expanded(
                       child: pw.Center(
-                        child: pw.Image(image, fit: pw.BoxFit.contain),
+                        child: pw.Image(image, fit: pw.BoxFit.fill),
                       ),
                     ),
                     if (firstPhotoIndex + 1 < totalPhotos) ...[
@@ -58,7 +58,7 @@ class PrintService {
                       ),
                       pw.Expanded(
                         child: pw.Center(
-                          child: pw.Image(image, fit: pw.BoxFit.contain),
+                          child: pw.Image(image, fit: pw.BoxFit.fill),
                         ),
                       ),
                     ],
