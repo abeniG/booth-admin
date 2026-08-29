@@ -54,7 +54,7 @@ class PrintService {
                     if (firstPhotoIndex + 1 < totalPhotos) ...[
                       pw.Container(
                         width: _centerBorderWidth,
-                        color: PdfColors.black,
+                        color: PdfColors.white,
                       ),
                       pw.Expanded(
                         child: pw.Center(
