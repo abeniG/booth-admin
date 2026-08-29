@@ -10,6 +10,7 @@ import 'package:booth_admin/features/photos/photos_screen.dart';
 import 'package:booth_admin/features/videos/videos_screen.dart';
 import 'package:booth_admin/features/qr_codes/qr_codes_screen.dart';
 import 'package:booth_admin/features/design_elements/screens/design_elements_screens.dart';
+import 'package:booth_admin/features/printables/printables_screen.dart';
 
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 final _shellNavigatorKey = GlobalKey<NavigatorState>();
@@ -59,6 +60,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/qr-codes',
             builder: (context, state) => const QRCodesScreen(),
+          ),
+          GoRoute(
+            path: '/printables',
+            builder: (context, state) => const PrintablesScreen(),
           ),
           GoRoute(
             path: '/design/stickers',
