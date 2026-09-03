@@ -1,285 +1,153 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_flutter/lucide_flutter.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
-import 'package:booth_admin/models/cloudinary_resource.dart';
-import 'package:booth_admin/services/cloudinary_provider.dart';
+import 'package:booth_admin/models/saved_media.dart';
+import 'package:booth_admin/services/saved_media_service.dart';
 
-class DashboardScreen extends ConsumerWidget {
+class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final photosAsync = ref.watch(cloudinaryPhotosProvider);
-    final videosAsync = ref.watch(cloudinaryVideosProvider);
-
+  Widget build(BuildContext context) {
     return MaxWidthContainer(
       child: Scaffold(
-        body: CustomScrollView(
-          slivers: [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Overview',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Welcome back! Here is what\'s happening with the photo booth today.',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppTheme.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-                    // ── Stats ──────────────────────────────────────────────────
-                    _StatsGrid(
-                      photosAsync: photosAsync,
-                      videosAsync: videosAsync,
-                    ),
-                    const SizedBox(height: 48),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        body: StreamBuilder<List<SavedMedia>>(
+          stream: SavedMediaService.streamSavedMedia(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(
+                  child: Text('Failed to load saved media: ${snapshot.error}'));
+            }
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+            final media = snapshot.data!;
+            return CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        const Text('Overview',
+                            style: TextStyle(
+                                fontSize: 28, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
                         const Text(
-                          'Recent Photos',
+                          'Welcome back! Here is what\'s happening with the photo booth today.',
                           style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
+                              fontSize: 16, color: AppTheme.textSecondary),
                         ),
-                        TextButton.icon(
-                          onPressed: () {},
-                          icon: const Icon(LucideIcons.arrowRight, size: 16),
-                          label: const Text('View All'),
-                        ),
+                        const SizedBox(height: 32),
+                        _StatsGrid(media: media),
+                        const SizedBox(height: 48),
+                        const Text('Recent Photos',
+                            style: TextStyle(
+                                fontSize: 20, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 16),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                  ],
+                  ),
                 ),
-              ),
-            ),
-            // ── Recent Photos ────────────────────────────────────────────────
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              sliver: photosAsync.when(
-                loading: () => const SliverToBoxAdapter(
-                  child: Center(child: CircularProgressIndicator()),
-                ),
-                error: (err, _) => SliverToBoxAdapter(
-                  child: _InlineError(message: err.toString()),
-                ),
-                data: (photos) => _RecentPhotosGrid(
-                  photos: photos.take(10).toList(),
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 48)),
-          ],
+                if (media.isEmpty)
+                  const SliverFillRemaining(
+                      child: Center(child: Text('No saved images found.')))
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    sliver: _SavedMediaGrid(media: media.take(10).toList()),
+                  ),
+                const SliverToBoxAdapter(child: SizedBox(height: 48)),
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
 class _StatsGrid extends StatelessWidget {
-  final AsyncValue<List<CloudinaryResource>> photosAsync;
-  final AsyncValue<List<CloudinaryResource>> videosAsync;
+  final List<SavedMedia> media;
 
-  const _StatsGrid({
-    required this.photosAsync,
-    required this.videosAsync,
-  });
+  const _StatsGrid({required this.media});
 
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    int crossAxisCount = screenWidth >= 1500 ? 6 : 4;
-    if (ResponsiveLayout.isMobile(context)) {
-      crossAxisCount = 2;
-    } else if (ResponsiveLayout.isTablet(context)) {
-      crossAxisCount = 3;
-    }
-
-    final photoCount =
-        photosAsync.maybeWhen(data: (p) => '${p.length}', orElse: () => '—');
-    final videoCount =
-        videosAsync.maybeWhen(data: (v) => '${v.length}', orElse: () => '—');
-
-    // Count how many photos were captured today
-    final todayCount = photosAsync.maybeWhen(
-      data: (p) {
-        final today = DateTime.now();
-        return p
-            .where((r) =>
-                r.createdAt.year == today.year &&
-                r.createdAt.month == today.month &&
-                r.createdAt.day == today.day)
-            .length;
-      },
-      orElse: () => 0,
-    );
-
-    final stats = [
-      {
-        'title': 'Total Photos',
-        'value': photoCount,
-        'subtitle': todayCount > 0 ? '+$todayCount today' : 'From Cloudinary',
-        'icon': LucideIcons.image,
-        'loading': photosAsync.isLoading,
-      },
-      {
-        'title': 'Total Videos',
-        'value': videoCount,
-        'subtitle': 'From Cloudinary',
-        'icon': LucideIcons.video,
-        'loading': videosAsync.isLoading,
-      },
-      {
-        'title': 'Active QRs',
-        'value': '—',
-        'subtitle': 'Coming soon',
-        'icon': LucideIcons.qrCode,
-        'loading': false,
-      },
-      {
-        'title': 'Stickers',
-        'value': '—',
-        'subtitle': 'Manage in Design',
-        'icon': LucideIcons.sticker,
-        'loading': false,
-      },
-      {
-        'title': 'Backgrounds',
-        'value': '—',
-        'subtitle': 'Manage in Design',
-        'icon': LucideIcons.image,
-        'loading': false,
-      },
-      {
-        'title': 'Filters',
-        'value': '—',
-        'subtitle': 'Preset styles',
-        'icon': LucideIcons.sparkles,
-        'loading': false,
-      },
-    ];
+    int columns = screenWidth >= 1500 ? 5 : 4;
+    if (ResponsiveLayout.isMobile(context)) columns = 2;
+    if (ResponsiveLayout.isTablet(context)) columns = 3;
 
     return Wrap(
       spacing: 16,
       runSpacing: 16,
-      children: stats.map((stat) {
-        return SizedBox(
-          width: _getCardWidth(context, crossAxisCount),
-          child: _StatCard(
-            title: stat['title'] as String,
-            value: stat['value'] as String,
-            subtitle: stat['subtitle'] as String,
-            icon: stat['icon'] as IconData,
-            isLoading: stat['loading'] as bool,
-          ),
-        );
+      children: [
+        _StatCard(
+            title: 'Total Photos',
+            value: '${media.length}',
+            icon: LucideIcons.image),
+        _StatCard(
+            title: 'Total Videos',
+            value: '${media.where((item) => item.videoUrl.isNotEmpty).length}',
+            icon: LucideIcons.video),
+      ].map((card) {
+        return SizedBox(width: _cardWidth(context, columns), child: card);
       }).toList(),
     );
   }
 
-  double _getCardWidth(BuildContext context, int columns) {
-    double screenWidth = MediaQuery.of(context).size.width;
-    const double padding = 48;
-    double navWidth = 0;
-    if (ResponsiveLayout.isDesktop(context)) {
-      navWidth = 250;
-      screenWidth = screenWidth > 1600 ? 1600 : screenWidth;
-    } else if (ResponsiveLayout.isTablet(context)) {
-      navWidth = 80;
-    }
-    final double availableWidth = screenWidth - padding - navWidth;
-    final double spacing = 16 * (columns - 1);
-    return ((availableWidth - spacing) / columns).floorToDouble();
+  double _cardWidth(BuildContext context, int columns) {
+    var width = MediaQuery.of(context).size.width;
+    final navWidth = ResponsiveLayout.isDesktop(context)
+        ? 250
+        : ResponsiveLayout.isTablet(context)
+            ? 80
+            : 0;
+    width = width > 1600 && ResponsiveLayout.isDesktop(context) ? 1600 : width;
+    return ((width - navWidth - 48 - 16 * (columns - 1)) / columns)
+        .floorToDouble();
   }
 }
 
 class _StatCard extends StatelessWidget {
   final String title;
   final String value;
-  final String subtitle;
   final IconData icon;
-  final bool isLoading;
 
   const _StatCard({
     required this.title,
     required this.value,
-    required this.subtitle,
     required this.icon,
-    required this.isLoading,
   });
 
   @override
   Widget build(BuildContext context) {
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
+        padding: const EdgeInsets.all(20),
+        child: Row(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(icon, size: 20, color: AppTheme.primary.withOpacity(0.8)),
-              ],
-            ),
-            const SizedBox(height: 16),
-            isLoading
-                ? const SizedBox(
-                    width: 24,
-                    height: 24,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
-                    ),
-                  ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: TextStyle(
-                fontSize: 12,
-                color: subtitle.contains('today') && !subtitle.contains('0')
-                    ? AppTheme.success
-                    : AppTheme.textSecondary,
-                fontWeight: FontWeight.w500,
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: const TextStyle(color: AppTheme.textSecondary)),
+                  const SizedBox(height: 12),
+                  Text(value,
+                      style: const TextStyle(
+                          fontSize: 28, fontWeight: FontWeight.bold)),
+                ],
               ),
             ),
+            Icon(icon, color: AppTheme.primary),
           ],
         ),
       ),
@@ -287,30 +155,28 @@ class _StatCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+class _SavedMediaGrid extends StatelessWidget {
+  final List<SavedMedia> media;
 
-class _RecentPhotosGrid extends StatelessWidget {
-  final List<CloudinaryResource> photos;
-  const _RecentPhotosGrid({required this.photos});
+  const _SavedMediaGrid({required this.media});
 
   @override
   Widget build(BuildContext context) {
     return SliverLayoutBuilder(
       builder: (context, constraints) {
-        int crossAxisCount = 5;
-        if (ResponsiveLayout.isMobile(context)) crossAxisCount = 2;
-        if (ResponsiveLayout.isTablet(context)) crossAxisCount = 3;
-
+        var columns = 5;
+        if (ResponsiveLayout.isMobile(context)) columns = 2;
+        if (ResponsiveLayout.isTablet(context)) columns = 3;
         return SliverGrid(
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
+            crossAxisCount: columns,
             mainAxisSpacing: 16,
             crossAxisSpacing: 16,
             childAspectRatio: 0.8,
           ),
           delegate: SliverChildBuilderDelegate(
-            (context, index) => _RecentPhotoCard(photo: photos[index]),
-            childCount: photos.length,
+            (context, index) => _SavedMediaCard(media: media[index]),
+            childCount: media.length,
           ),
         );
       },
@@ -318,90 +184,50 @@ class _RecentPhotosGrid extends StatelessWidget {
   }
 }
 
-class _RecentPhotoCard extends StatelessWidget {
-  final CloudinaryResource photo;
-  const _RecentPhotoCard({required this.photo});
+class _SavedMediaCard extends StatelessWidget {
+  final SavedMedia media;
+
+  const _SavedMediaCard({required this.media});
 
   @override
   Widget build(BuildContext context) {
-    final isToday = () {
-      final now = DateTime.now();
-      return photo.createdAt.year == now.year &&
-          photo.createdAt.month == now.month &&
-          photo.createdAt.day == now.day;
-    }();
-
     return Card(
       clipBehavior: Clip.antiAlias,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Expanded(
             child: CachedNetworkImage(
-              imageUrl: photo.secureUrl,
+              imageUrl: media.imageUrl,
+              width: double.infinity,
               fit: BoxFit.cover,
-              placeholder: (_, __) => Container(
-                color: Colors.grey.shade200,
-                child: const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              ),
-              errorWidget: (_, __, ___) => Container(
-                color: Colors.grey.shade200,
-                child:
-                    const Icon(LucideIcons.image, size: 48, color: Colors.grey),
-              ),
+              errorWidget: (_, __, ___) =>
+                  const Center(child: Icon(LucideIcons.imageOff, size: 48)),
             ),
           ),
-          Container(
-            padding: const EdgeInsets.all(12.0),
-            color: AppTheme.surface,
+          Padding(
+            padding: const EdgeInsets.all(10),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        isToday
-                            ? DateFormat('HH:mm')
-                                .format(photo.createdAt.toLocal())
-                            : DateFormat('MMM d')
-                                .format(photo.createdAt.toLocal()),
-                        style: TextStyle(
-                            fontSize: 11, color: AppTheme.textSecondary),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(LucideIcons.checkCircle2,
-                        size: 14, color: AppTheme.success),
-                  ],
-                ),
-                const SizedBox(height: 8),
+                Text(DateFormat('MMM d, y').format(media.createdAt.toLocal()),
+                    style: const TextStyle(
+                        fontSize: 11, color: AppTheme.textSecondary)),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     IconButton(
+                      tooltip: 'View image',
                       icon: const Icon(LucideIcons.eye, size: 16),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => _view(context),
                     ),
                     IconButton(
+                      tooltip: 'Download image and video',
                       icon: const Icon(LucideIcons.download, size: 16),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => _download(context),
                     ),
                     IconButton(
+                      tooltip: 'Generate QR code',
                       icon: const Icon(LucideIcons.qrCode, size: 16),
-                      onPressed: () {},
-                      padding: EdgeInsets.zero,
-                      constraints:
-                          const BoxConstraints(minWidth: 32, minHeight: 32),
+                      onPressed: () => _showQr(context),
                     ),
                   ],
                 ),
@@ -412,32 +238,51 @@ class _RecentPhotoCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _InlineError extends StatelessWidget {
-  final String message;
-  const _InlineError({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.error.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(12),
+  void _view(BuildContext context) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        child: InteractiveViewer(
+          child: Image.network(media.imageUrl, fit: BoxFit.contain),
+        ),
       ),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.alertCircle, color: AppTheme.error, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              message.contains('YOUR_API_KEY')
-                  ? 'Set your Cloudinary API Key & Secret in cloudinary_service.dart'
-                  : 'Could not load photos: $message',
-              style: const TextStyle(color: AppTheme.error, fontSize: 13),
-            ),
-          ),
+    );
+  }
+
+  Future<void> _download(BuildContext context) async {
+    final urls = [
+      media.imageUrl,
+      if (media.videoUrl.isNotEmpty) media.videoUrl
+    ];
+    for (final url in urls) {
+      await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Download links opened.')));
+    }
+  }
+
+  void _showQr(BuildContext context) {
+    final videoQuery = media.videoUrl.isEmpty
+        ? ''
+        : '&videoUrl=${Uri.encodeComponent(media.videoUrl)}';
+    final landingUrl =
+        'https://photo-booth-landing.abenikeradio.workers.dev/?url=${Uri.encodeComponent(media.imageUrl)}$videoQuery';
+
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Scan to view media'),
+        content: SizedBox(
+          width: 260,
+          child: QrImageView(data: landingUrl, size: 240),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Close')),
         ],
       ),
     );

@@ -24,8 +24,6 @@ final List<_NavItem> _navItems = [
       label: 'Dashboard',
       icon: LucideIcons.layoutDashboard,
       path: '/dashboard'),
-  _NavItem(label: 'Videos', icon: LucideIcons.video, path: '/videos'),
-  _NavItem(label: 'QR Codes', icon: LucideIcons.qrCode, path: '/qr-codes'),
   _NavItem(label: 'Printables', icon: LucideIcons.printer, path: '/printables'),
   _NavItem(label: 'Price', icon: LucideIcons.tag, path: '/price'),
   _NavItem(

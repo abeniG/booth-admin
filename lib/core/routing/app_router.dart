@@ -6,8 +6,6 @@ import 'package:booth_admin/features/auth/auth_provider.dart';
 import 'package:booth_admin/features/auth/login_screen.dart';
 import 'package:booth_admin/shared/widgets/main_layout.dart';
 import 'package:booth_admin/features/dashboard/dashboard_screen.dart';
-import 'package:booth_admin/features/videos/videos_screen.dart';
-import 'package:booth_admin/features/qr_codes/qr_codes_screen.dart';
 import 'package:booth_admin/features/design_elements/screens/design_elements_screens.dart';
 import 'package:booth_admin/features/printables/printables_screen.dart';
 import 'package:booth_admin/features/price/price_screen.dart';
@@ -48,14 +46,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/dashboard',
             builder: (context, state) => const DashboardScreen(),
-          ),
-          GoRoute(
-            path: '/videos',
-            builder: (context, state) => const VideosScreen(),
-          ),
-          GoRoute(
-            path: '/qr-codes',
-            builder: (context, state) => const QRCodesScreen(),
           ),
           GoRoute(
             path: '/printables',
