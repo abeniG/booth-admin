@@ -75,11 +75,45 @@ class _PrintableCard extends StatefulWidget {
 
 class _PrintableCardState extends State<_PrintableCard> {
   bool _isPrinting = false;
+  late final TextEditingController _widthController = TextEditingController(
+    text: _initialDimension(widget.printable.printWidthInches, 3.94),
+  );
+  late final TextEditingController _heightController = TextEditingController(
+    text: _initialDimension(widget.printable.printHeightInches, 5.83),
+  );
+
+  String _initialDimension(double value, double fallback) {
+    return (value > 0 ? value : fallback).toStringAsFixed(2);
+  }
+
+  @override
+  void dispose() {
+    _widthController.dispose();
+    _heightController.dispose();
+    super.dispose();
+  }
 
   Future<void> _print() async {
+    final widthInches = double.tryParse(_widthController.text.trim());
+    final heightInches = double.tryParse(_heightController.text.trim());
+    if (widthInches == null ||
+        heightInches == null ||
+        widthInches <= 0 ||
+        heightInches <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Enter positive width and height in inches.')),
+      );
+      return;
+    }
+
     setState(() => _isPrinting = true);
     try {
-      final printed = await PrintService.printPrintable(widget.printable);
+      final printed = await PrintService.printPrintable(
+        widget.printable,
+        widthInches: widthInches,
+        heightInches: heightInches,
+      );
       if (printed) {
         await PrintableService.markAsSuccess(widget.printable.id);
       }
@@ -146,6 +180,30 @@ class _PrintableCardState extends State<_PrintableCard> {
               backgroundColor: isPending
                   ? Colors.orange.withValues(alpha: 0.12)
                   : AppTheme.success.withValues(alpha: 0.12),
+            ),
+            SizedBox(
+              width: 110,
+              child: TextField(
+                controller: _widthController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Width',
+                  suffixText: 'in',
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 110,
+              child: TextField(
+                controller: _heightController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Height',
+                  suffixText: 'in',
+                ),
+              ),
             ),
             ElevatedButton.icon(
               onPressed: isPending && !_isPrinting ? _print : null,
