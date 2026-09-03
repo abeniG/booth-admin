@@ -15,4 +15,8 @@ class PrintableService {
   static Future<void> markAsSuccess(String id) {
     return _collection.doc(id).update({'status': 'success'});
   }
+
+  static Future<void> updatePrice(String id, double price) {
+    return _collection.doc(id).update({'price': price});
+  }
 }

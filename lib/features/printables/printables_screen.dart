@@ -65,6 +65,42 @@ class _PrintableCard extends StatefulWidget {
 
 class _PrintableCardState extends State<_PrintableCard> {
   bool _isPrinting = false;
+  bool _isSavingPrice = false;
+  late final TextEditingController _priceController = TextEditingController(
+    text: widget.printable.price.toStringAsFixed(0),
+  );
+
+  @override
+  void dispose() {
+    _priceController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _savePrice() async {
+    final price = double.tryParse(_priceController.text.trim());
+    if (price == null || price < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid price.')),
+      );
+      return;
+    }
+
+    setState(() => _isSavingPrice = true);
+    try {
+      await PrintableService.updatePrice(widget.printable.id, price);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Price saved.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Unable to save price: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSavingPrice = false);
+    }
+  }
 
   Future<void> _print() async {
     setState(() => _isPrinting = true);
@@ -136,6 +172,28 @@ class _PrintableCardState extends State<_PrintableCard> {
               backgroundColor: isPending
                   ? Colors.orange.withValues(alpha: 0.12)
                   : AppTheme.success.withValues(alpha: 0.12),
+            ),
+            SizedBox(
+              width: 150,
+              child: TextField(
+                controller: _priceController,
+                keyboardType:
+                    const TextInputType.numberWithOptions(decimal: true),
+                decoration: const InputDecoration(
+                  labelText: 'Price (ETB)',
+                  prefixText: 'ETB ',
+                ),
+              ),
+            ),
+            OutlinedButton(
+              onPressed: _isSavingPrice ? null : _savePrice,
+              child: _isSavingPrice
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Save'),
             ),
             ElevatedButton.icon(
               onPressed: isPending && !_isPrinting ? _print : null,

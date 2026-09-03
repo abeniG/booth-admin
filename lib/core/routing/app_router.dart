@@ -6,7 +6,6 @@ import 'package:booth_admin/features/auth/auth_provider.dart';
 import 'package:booth_admin/features/auth/login_screen.dart';
 import 'package:booth_admin/shared/widgets/main_layout.dart';
 import 'package:booth_admin/features/dashboard/dashboard_screen.dart';
-import 'package:booth_admin/features/photos/photos_screen.dart';
 import 'package:booth_admin/features/videos/videos_screen.dart';
 import 'package:booth_admin/features/qr_codes/qr_codes_screen.dart';
 import 'package:booth_admin/features/design_elements/screens/design_elements_screens.dart';
@@ -50,10 +49,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             builder: (context, state) => const DashboardScreen(),
           ),
           GoRoute(
-            path: '/photos',
-            builder: (context, state) => const PhotosScreen(),
-          ),
-          GoRoute(
             path: '/videos',
             builder: (context, state) => const VideosScreen(),
           ),
@@ -76,6 +71,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: '/design/filters',
             builder: (context, state) => const FiltersScreen(),
+          ),
+          GoRoute(
+            path: '/design/cover-pages',
+            builder: (context, state) => const CoverPagesScreen(),
           ),
         ],
       ),

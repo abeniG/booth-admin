@@ -10,6 +10,7 @@ class Printable {
   final String printSize;
   final double printWidthInches;
   final String status;
+  final double price;
 
   const Printable({
     required this.id,
@@ -21,6 +22,7 @@ class Printable {
     required this.printSize,
     required this.printWidthInches,
     required this.status,
+    required this.price,
   });
 
   factory Printable.fromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -43,6 +45,7 @@ class Printable {
       printWidthInches:
           _doubleValue(data['printWidthInches'] ?? data['print_width_inches']),
       status: (data['status'] ?? 'pending').toString().toLowerCase(),
+      price: _doubleValue(data['price'], fallback: 400),
     );
   }
 
@@ -50,7 +53,9 @@ class Printable {
     return value is num ? value.toInt() : int.tryParse('$value') ?? fallback;
   }
 
-  static double _doubleValue(Object? value) {
-    return value is num ? value.toDouble() : double.tryParse('$value') ?? 0;
+  static double _doubleValue(Object? value, {double fallback = 0}) {
+    return value is num
+        ? value.toDouble()
+        : double.tryParse('$value') ?? fallback;
   }
 }

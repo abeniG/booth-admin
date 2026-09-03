@@ -42,3 +42,16 @@ class FiltersScreen extends StatelessWidget {
     );
   }
 }
+
+class CoverPagesScreen extends StatelessWidget {
+  const CoverPagesScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return DesignElementGrid(
+      title: 'Cover Pages',
+      itemType: 'Cover Page',
+      onUploadPressed: () => UploadModal.show(context, 'Cover Page'),
+    );
+  }
+}

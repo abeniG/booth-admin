@@ -36,6 +36,8 @@ class DesignAssetService {
         return 'backgrounds';
       case 'filter':
         return 'filters';
+      case 'cover page':
+        return 'cover_pages';
       default:
         return '${itemType.toLowerCase()}s';
     }

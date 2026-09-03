@@ -38,7 +38,8 @@ class UploadModal extends StatefulWidget {
 class _UploadModalState extends State<UploadModal> {
   final TextEditingController _nameController = TextEditingController();
   PlatformFile? _selectedFile;
-  bool isActive = true;
+  bool get isActiveByDefault => widget.itemType.toLowerCase() != 'cover page';
+  late bool isActive = isActiveByDefault;
   bool _isUploading = false;
 
   @override
@@ -81,7 +82,7 @@ class _UploadModalState extends State<UploadModal> {
 
     try {
       final bytes = await _readFileBytes(file);
-      final folder = '${widget.itemType.toLowerCase()}s';
+      final folder = '${widget.itemType.toLowerCase().replaceAll(' ', '_')}s';
       final url = await CloudinaryService.uploadImage(
         bytes,
         file.name,

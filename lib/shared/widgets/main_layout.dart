@@ -24,7 +24,6 @@ final List<_NavItem> _navItems = [
       label: 'Dashboard',
       icon: LucideIcons.layoutDashboard,
       path: '/dashboard'),
-  _NavItem(label: 'Photos', icon: LucideIcons.image, path: '/photos'),
   _NavItem(label: 'Videos', icon: LucideIcons.video, path: '/videos'),
   _NavItem(label: 'QR Codes', icon: LucideIcons.qrCode, path: '/qr-codes'),
   _NavItem(label: 'Printables', icon: LucideIcons.printer, path: '/printables'),
@@ -36,6 +35,10 @@ final List<_NavItem> _navItems = [
       path: '/design/backgrounds'),
   _NavItem(
       label: 'Filters', icon: LucideIcons.sparkles, path: '/design/filters'),
+  _NavItem(
+      label: 'Cover Pages',
+      icon: LucideIcons.bookOpen,
+      path: '/design/cover-pages'),
 ];
 
 class _NavItem {

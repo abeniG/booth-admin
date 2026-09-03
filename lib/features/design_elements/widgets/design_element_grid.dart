@@ -4,7 +4,7 @@ import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
 import 'package:booth_admin/services/design_asset_service.dart';
 
-class DesignElementGrid extends StatelessWidget {
+class DesignElementGrid extends StatefulWidget {
   final String title;
   final String itemType;
   final VoidCallback onUploadPressed;
@@ -15,6 +15,20 @@ class DesignElementGrid extends StatelessWidget {
     required this.itemType,
     required this.onUploadPressed,
   });
+
+  @override
+  State<DesignElementGrid> createState() => _DesignElementGridState();
+}
+
+class _DesignElementGridState extends State<DesignElementGrid> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,14 +46,14 @@ class DesignElementGrid extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        title,
+                        widget.title,
                         style: const TextStyle(
                             fontSize: 28, fontWeight: FontWeight.bold),
                       ),
                       ElevatedButton.icon(
-                        onPressed: onUploadPressed,
+                        onPressed: widget.onUploadPressed,
                         icon: const Icon(LucideIcons.plus),
-                        label: Text('Upload $itemType'),
+                        label: Text('Upload ${widget.itemType}'),
                       ),
                     ],
                   ),
@@ -49,8 +63,11 @@ class DesignElementGrid extends StatelessWidget {
                         ? double.infinity
                         : 300,
                     child: TextField(
+                      controller: _searchController,
+                      onChanged: (value) =>
+                          setState(() => _searchQuery = value),
                       decoration: InputDecoration(
-                        hintText: 'Search $title...',
+                        hintText: 'Search ${widget.title}...',
                         prefixIcon: const Icon(LucideIcons.search),
                       ),
                     ),
@@ -69,18 +86,22 @@ class DesignElementGrid extends StatelessWidget {
 
   Widget _buildGrid(BuildContext context) {
     return StreamBuilder<List<DesignAsset>>(
-      stream: DesignAssetService.streamAssets(itemType),
+      stream: DesignAssetService.streamAssets(widget.itemType),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return Center(child: Text('Failed to load $title.'));
+          return Center(child: Text('Failed to load ${widget.title}.'));
         }
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
-        final assets = snapshot.data!;
+        final query = _searchQuery.trim().toLowerCase();
+        final assets = snapshot.data!
+            .where((asset) =>
+                query.isEmpty || asset.name.toLowerCase().contains(query))
+            .toList();
         if (assets.isEmpty) {
-          return Center(child: Text('No $title uploaded yet.'));
+          return Center(child: Text('No ${widget.title} found.'));
         }
 
         return LayoutBuilder(
@@ -105,7 +126,7 @@ class DesignElementGrid extends StatelessWidget {
               itemCount: assets.length,
               itemBuilder: (context, index) {
                 return _DesignElementCard(
-                  type: itemType,
+                  type: widget.itemType,
                   asset: assets[index],
                 );
               },
