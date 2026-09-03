@@ -27,6 +27,7 @@ final List<_NavItem> _navItems = [
   _NavItem(label: 'Videos', icon: LucideIcons.video, path: '/videos'),
   _NavItem(label: 'QR Codes', icon: LucideIcons.qrCode, path: '/qr-codes'),
   _NavItem(label: 'Printables', icon: LucideIcons.printer, path: '/printables'),
+  _NavItem(label: 'Price', icon: LucideIcons.tag, path: '/price'),
   _NavItem(
       label: 'Stickers', icon: LucideIcons.sticker, path: '/design/stickers'),
   _NavItem(
@@ -194,7 +195,7 @@ class _DesktopLayout extends StatelessWidget {
                               ),
                             ),
                             tileColor: isSelected
-                                ? AppTheme.primary.withOpacity(0.1)
+                                ? AppTheme.primary.withValues(alpha: 0.1)
                                 : null,
                             onTap: () {
                               context.go(item.path);
@@ -232,7 +233,7 @@ class _DrawerHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.primary.withOpacity(0.1),
+              color: AppTheme.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(LucideIcons.camera, color: AppTheme.primary),

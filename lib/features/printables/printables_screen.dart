@@ -4,7 +4,6 @@ import 'package:booth_admin/core/responsive/responsive_layout.dart';
 import 'package:booth_admin/core/theme/app_theme.dart';
 import 'package:booth_admin/models/printable.dart';
 import 'package:booth_admin/services/print_service.dart';
-import 'package:booth_admin/services/print_price_service.dart';
 import 'package:booth_admin/services/printable_service.dart';
 
 class PrintablesScreen extends StatelessWidget {
@@ -52,8 +51,6 @@ class PrintablesScreen extends StatelessWidget {
                           itemBuilder: (context, index) =>
                               _PrintableCard(printable: printables[index]),
                         ),
-                        const SizedBox(height: 24),
-                        _PricesSection(printables: printables),
                       ],
                     ),
                   );
@@ -163,142 +160,6 @@ class _PrintableCardState extends State<_PrintableCard> {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _PricesSection extends StatelessWidget {
-  final List<Printable> printables;
-
-  const _PricesSection({required this.printables});
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: StreamBuilder(
-          stream: PrintPriceService.streamPrices(),
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Text('Failed to load prices: ${snapshot.error}');
-            }
-            if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
-            }
-            final prices = {
-              for (final price in snapshot.data!)
-                price.printableId: price.amount,
-            };
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Prices',
-                    style:
-                        TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                for (final printable in printables) ...[
-                  _PriceEditor(
-                    printable: printable,
-                    initialAmount: prices[printable.id] ?? 400,
-                  ),
-                  if (printable != printables.last) const Divider(height: 32),
-                ],
-              ],
-            );
-          },
-        ),
-      ),
-    );
-  }
-}
-
-class _PriceEditor extends StatefulWidget {
-  final Printable printable;
-  final double initialAmount;
-
-  const _PriceEditor({
-    required this.printable,
-    required this.initialAmount,
-  });
-
-  @override
-  State<_PriceEditor> createState() => _PriceEditorState();
-}
-
-class _PriceEditorState extends State<_PriceEditor> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initialAmount.toStringAsFixed(0),
-  );
-  bool _isSaving = false;
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final amount = double.tryParse(_controller.text.trim());
-    if (amount == null || amount < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid price.')),
-      );
-      return;
-    }
-    setState(() => _isSaving = true);
-    try {
-      await PrintPriceService.updatePrice(widget.printable.id, amount);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Price saved.')),
-      );
-    } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Unable to save price: $error')),
-      );
-    } finally {
-      if (mounted) setState(() => _isSaving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          widget.printable.printSize.isEmpty
-              ? 'Printable price'
-              : widget.printable.printSize,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-          textAlign: TextAlign.center,
-        ),
-        const SizedBox(height: 10),
-        SizedBox(
-          width: 180,
-          child: TextField(
-            controller: _controller,
-            textAlign: TextAlign.center,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Price (ETB)',
-              prefixText: 'ETB ',
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton(
-          onPressed: _isSaving ? null : _save,
-          child: _isSaving
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 }
